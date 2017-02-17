@@ -1,12 +1,25 @@
+from __future__ import print_function
 from itertools import repeat
 import random
 
 def dice(args):
+  usage = '!dice <num>d<sides> [<num>d<sides>] ...'
   dice = []
+  
+  import types
+  if isinstance(args, types.StringTypes):
+    args = args.split(" ")
+
+  print(args)
+
   if args is None or len(args) == 0:
     dice = (6,)
   else:
       for arg in args:
+        if arg is None:
+          return usage
+
+        # print("arg is", arg)
         if not 'd' in arg:
             continue
         num, sides = arg.split('d')
@@ -19,15 +32,26 @@ def dice(args):
         except ValueError:
             continue
 
-        if not ((0 < num < 10) and (4 < sides < 100)):
+        if not ((0 < num <= 10) and (4 <= sides <= 100)):
             continue
 
-        dice.extend(sum(random.randint(1, sides) for _ in xrange(num)))
+        # print("Rolling {0} {1}-sided dice(s)".format(num, sides))
 
-  usage = '!dice <num>d<sides> [<num>d<sides>] ...'
+        rolls = [random.randint(1, sides) for _ in xrange(num)]
+        roll_sum = sum(rolls)
+        # print("You rolled:", ";".join(str(x) for x in rolls), "sum is", roll_sum)
+        
+        dice.append(roll_sum)
 
-  # carry out validation
-  try:
-    return "You rolled: {}".format(", ".join(dice))
-  except:
-    return usage
+  return "You rolled: {}".format(", ".join(str(x) for x in dice))
+
+def new_print(value, *args, **kwargs):
+    pass
+
+if __name__ == "__main__":
+  print("Test mode")
+  dice("d4")
+  dice(["1d4", "2d6"])
+  dice("2d6")
+#else:
+#  print=new_print
