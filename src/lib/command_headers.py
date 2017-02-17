@@ -5,18 +5,22 @@ commands = {
 		'limit': 30,
 		'return': 'This is a test!'
 	},
+    '!dice': {
+        'limit': 5,
+        'argc': 1,
+        'return': 'command'
+    }
+#	'!randomemote': {
+#		'limit': 180,
+#		'argc': 0,
+#		'return': 'command'
+#	},
 
-	'!randomemote': {
-		'limit': 180,
-		'argc': 0,
-		'return': 'command'
-	},
-
-	'!wow': {
-		'limit': 30,
-		'argc': 3,
-		'return': 'command'
-	}
+#	'!wow': {
+#		'limit': 30,
+#		'argc': 3,
+#		'return': 'command'
+#	}
 }
 
 
