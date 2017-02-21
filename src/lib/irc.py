@@ -1,90 +1,107 @@
-import socket, re, time, sys
-from functions_general import *
-import cron
+import re
+import socket
+import sys
 import thread
 
+import cron
+from functions_general import *
+
+
 class irc:
-	
-	def __init__(self, config):
-		self.config = config
+    def __init__(self, config):
+        self.config = config
 
-	def check_for_message(self, data):
-		if re.match(r'^:[a-zA-Z0-9_]+\![a-zA-Z0-9_]+@[a-zA-Z0-9_]+(\.tmi\.twitch\.tv|\.testserver\.local) PRIVMSG #[a-zA-Z0-9_]+ :.+$', data):
-			return True
+    def check_for_message(self, data):
+        if re.match(
+                r'^:[a-zA-Z0-9_]+\![a-zA-Z0-9_]+@[a-zA-Z0-9_]+(\.tmi\.twitch\.tv|\.testserver\.local) PRIVMSG #[a-zA-Z0-9_]+ :.+$',
+                data):
+            return True
 
-	def check_is_command(self, message, valid_commands):
-		for command in valid_commands:
-			if command == message:
-				return True
+    def check_is_command(self, message, valid_commands):
+        for command in valid_commands:
+            if command == message:
+                return True
 
-	def check_for_connected(self, data):
-		if re.match(r'^:.+ 001 .+ :connected to TMI$', data):
-			return True
+    def check_for_connected(self, data):
+        if re.match(r'^:.+ 001 .+ :connected to TMI$', data):
+            return True
 
-	def check_for_ping(self, data):
-		if data[:4] == "PING": 
-			self.sock.send('PONG')
+    def check_for_ping(self, data):
+        if data[:4] == "PING":
+            self.sock.send('PONG')
 
-	def get_message(self, data):
-		return {
-			'channel': re.findall(r'^:.+\![a-zA-Z0-9_]+@[a-zA-Z0-9_]+.+ PRIVMSG (.*?) :', data)[0],
-			'username': re.findall(r'^:([a-zA-Z0-9_]+)\!', data)[0],
-			'message': re.findall(r'PRIVMSG #[a-zA-Z0-9_]+ :(.+)', data)[0].decode('utf8')
-		}
+    def get_message(self, data):
+        return {
+            'channel': re.findall(r'^:.+\![a-zA-Z0-9_]+@[a-zA-Z0-9_]+.+ PRIVMSG (.*?) :', data)[0],
+            'username': re.findall(r'^:([a-zA-Z0-9_]+)\!', data)[0],
+            'message': re.findall(r'PRIVMSG #[a-zA-Z0-9_]+ :(.+)', data)[0].decode('utf8')
+        }
 
-	def check_login_status(self, data):
-		if re.match(r'^:(testserver\.local|tmi\.twitch\.tv) NOTICE \* :Login unsuccessful\r\n$', data):
-			return False
-		else:
-			return True
+    def check_login_status(self, data):
+        if re.match(r'^:(testserver\.local|tmi\.twitch\.tv) NOTICE \* :Login unsuccessful\r\n$', data):
+            return False
+        else:
+            return True
 
-	def send_message(self, channel, message):
-		self.sock.send('PRIVMSG %s :%s\n' % (channel, message.encode('utf-8')))
+    def send_message(self, channel, message):
+        self.sock.send('PRIVMSG %s :%s\n' % (channel, message.encode('utf-8')))
 
-	def get_irc_socket_object(self):
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		sock.settimeout(10)
+    def get_irc_socket_object(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
 
-		self.sock = sock
+        self.sock = sock
 
-		try:
-			sock.connect((self.config['server'], self.config['port']))
-		except:
-			pp('Cannot connect to server (%s:%s).' % (self.config['server'], self.config['port']), 'error')
-			sys.exit()
+        try:
+            sock.connect((self.config['server'], self.config['port']))
+        except:
+            pp('Cannot connect to server (%s:%s).' % (self.config['server'], self.config['port']), 'error')
+            sys.exit()
 
-		sock.settimeout(None)
+        sock.settimeout(None)
 
-		sock.send('USER %s\r\n' % self.config['username'])
-		sock.send('PASS %s\r\n' % self.config['oauth_password'])
-		sock.send('NICK %s\r\n' % self.config['username'])
+        sock.send('USER %s\r\n' % self.config['username'])
+        sock.send('PASS %s\r\n' % self.config['oauth_password'])
+        sock.send('NICK %s\r\n' % self.config['username'])
 
-		if self.check_login_status(sock.recv(1024)):
-			pp('Login successful.')
-		else:
-			pp('Login unsuccessful. (hint: make sure your oauth token is set in self.config/self.config.py).', 'error')
-			sys.exit()
+        if self.check_login_status(sock.recv(1024)):
+            pp('Login successful.')
+        else:
+            pp('Login unsuccessful. (hint: make sure your oauth token is set in self.config/self.config.py).', 'error')
+            sys.exit()
 
-		# start threads for channels that have cron messages to run
-		for channel in self.config['channels']:
-			if channel in self.config['cron']:
-				if self.config['cron'][channel]['run_cron']:
-					thread.start_new_thread(cron.cron(self, channel).run, ())
+        sock.send("CAP REQ :twitch.tv/membership")
 
-		self.join_channels(self.channels_to_string(self.config['channels']))
+        if self.check_for_cap(sock.recv(2014)):
+            pp('Capabilities request successful')
+        else:
+            pp('Failed to request capabilities')
 
+        # start threads for channels that have cron messages to run
+        for channel in self.config['channels']:
+            if channel in self.config['cron']:
+                if self.config['cron'][channel]['run_cron']:
+                    thread.start_new_thread(cron.cron(self, channel).run, ())
 
-		return sock
+        self.join_channels(self.channels_to_string(self.config['channels']))
 
-	def channels_to_string(self, channel_list):
-		return ','.join(channel_list)
+        return sock
 
-	def join_channels(self, channels):
-		pp('Joining channels %s.' % channels)
-		self.sock.send('JOIN %s\r\n' % channels)
-		pp('Joined channels.')
+    def channels_to_string(self, channel_list):
+        return ','.join(channel_list)
 
-	def leave_channels(self, channels):
-		pp('Leaving chanels %s,' % channels)
-		self.sock.send('PART %s\r\n' % channels)
-		pp('Left channels.')
+    def join_channels(self, channels):
+        pp('Joining channels %s.' % channels)
+        self.sock.send('JOIN %s\r\n' % channels)
+        pp('Joined channels.')
+
+    def leave_channels(self, channels):
+        pp('Leaving chanels %s,' % channels)
+        self.sock.send('PART %s\r\n' % channels)
+        pp('Left channels.')
+
+    def check_for_cap(self, data):
+        if re.match(r'^:(testserver\.local|tmi\.twitch\.tv) CAP \* ACK :twitch.tv/membership\r\n$', data):
+            return True
+        else:
+            return False

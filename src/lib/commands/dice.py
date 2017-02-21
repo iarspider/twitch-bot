@@ -1,57 +1,54 @@
 from __future__ import print_function
-from itertools import repeat
+
 import random
 
+
 def dice(args):
-  usage = '!dice <num>d<sides> [<num>d<sides>] ...'
-  dice = []
-  
-  import types
-  if isinstance(args, types.StringTypes):
-    args = args.split(" ")
+    usage = '!dice <num>d<sides> [<num>d<sides>] ...'
+    dices = []
 
-  print(args)
+    import types
+    if isinstance(args, types.StringTypes):
+        args = args.split(" ")
 
-  if args is None or len(args) == 0:
-    dice = (6,)
-  else:
-      for arg in args:
-        if arg is None:
-          return usage
+    print(args)
 
-        # print("arg is", arg)
-        if not 'd' in arg:
-            continue
-        num, sides = arg.split('d')
-        try:
-            if not num:
-                num = 1
-            else:
-                num = int(num)
-            sides = int(sides)
-        except ValueError:
-            continue
+    if args is None or len(args) == 0:
+        dices = (6,)
+    else:
+        for arg in args:
+            if arg is None:
+                return usage
 
-        if not ((0 < num <= 10) and (4 <= sides <= 100)):
-            continue
+            # print("arg is", arg)
+            if 'd' not in arg:
+                continue
+            num, sides = arg.split('d')
+            try:
+                if not num:
+                    num = 1
+                else:
+                    num = int(num)
+                sides = int(sides)
+            except ValueError:
+                continue
 
-        # print("Rolling {0} {1}-sided dice(s)".format(num, sides))
+            if not ((0 < num <= 10) and (4 <= sides <= 100)):
+                continue
 
-        rolls = [random.randint(1, sides) for _ in xrange(num)]
-        roll_sum = sum(rolls)
-        # print("You rolled:", ";".join(str(x) for x in rolls), "sum is", roll_sum)
-        
-        dice.append(roll_sum)
+            # print("Rolling {0} {1}-sided dice(s)".format(num, sides))
 
-  return "You rolled: {}".format(", ".join(str(x) for x in dice))
+            rolls = [random.randint(1, sides) for _ in xrange(num)]
+            roll_sum = sum(rolls)
+            # print("You rolled:", ";".join(str(x) for x in rolls), "sum is", roll_sum)
 
-def new_print(value, *args, **kwargs):
-    pass
+            dices.append(roll_sum)
+
+    return "You rolled: {}".format(", ".join(str(x) for x in dices))
+
 
 if __name__ == "__main__":
-  print("Test mode")
-  dice("d4")
-  dice(["1d4", "2d6"])
-  dice("2d6")
-#else:
-#  print=new_print
+    print("Test mode")
+    dice("d4")
+    dice(["1d4", "2d6"])
+    dice("2d6")
