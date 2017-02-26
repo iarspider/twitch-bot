@@ -71,7 +71,7 @@ class irc:
             sys.exit()
 
         # sock.send("CAP REQ :twitch.tv/tags\x0d\x0a")
-        sock.send("CAP REQ :twitch.tv/commands\x0d\x0a")
+        # sock.send("CAP REQ :twitch.tv/commands\x0d\x0a")
         sock.send("CAP REQ :twitch.tv/membership\x0d\x0a")
         sock.send("CAP END\x0d\x0a")
 
