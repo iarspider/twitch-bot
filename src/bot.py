@@ -7,6 +7,7 @@ Developed by Aidan Thomson <aidraj0@gmail.com>
 import lib.functions_commands as commands
 import lib.irc as irc_
 from lib.functions_general import *
+from collections import defaultdict
 
 
 class Roboraj:
@@ -14,6 +15,7 @@ class Roboraj:
         self.config = config
         self.irc = irc_.irc(config)
         self.socket = self.irc.get_irc_socket_object()
+        self.users = defaultdict(set)
 
     def run(self):
         irc = self.irc
@@ -33,6 +35,19 @@ class Roboraj:
             # check for ping, reply with pong
             irc.check_for_ping(data)
 
+            if irc.check_for_join(data):
+                user, channel = irc.get_join(data)
+                self.users[channel].add(user)
+                pp("User {0} joined {1}".format(user, channel))
+    
+            if irc.check_for_part(data):
+                user, channel = irc.get_part(data)
+                try:
+                    self.users[channel].remove(user)
+                except KeyError:
+                    pass
+                pp("User {0} left {1}".format(user, channel))
+
             if irc.check_for_message(data):
                 message_dict = irc.get_message(data)
 
@@ -48,10 +63,8 @@ class Roboraj:
 
                     if commands.check_returns_function(command.split(' ')[0]):
                         if commands.check_has_correct_args(command, command.split(' ')[0]):
-                            args = command.split(' ')
-                            del args[0]
-
                             command = command.split(' ')[0]
+                            args = command.split(' ')[1:]
 
                             if commands.is_on_cooldown(command, channel):
                                 pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (
@@ -64,13 +77,14 @@ class Roboraj:
                                      channel
                                      )
 
-                                result = commands.pass_to_function(command, args)
+                                result = commands.pass_to_function(command[1:], args, username, self.users[channel])
                                 commands.update_last_used(command, channel)
 
                                 if result:
-                                    resp = '(%s) > %s' % (username, result)
-                                    pbot(resp, channel)
-                                    irc.send_message(channel, resp)
+                                    for r in result:
+                                        resp = '(%s) > %s' % (username, r)
+                                        pbot(resp, channel)
+                                        irc.send_message(channel, resp)
 
                     else:
                         if commands.is_on_cooldown(command, channel):

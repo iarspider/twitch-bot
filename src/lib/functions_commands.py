@@ -1,5 +1,6 @@
 import importlib
 import time
+import types
 
 from command_headers import *
 
@@ -58,15 +59,11 @@ def check_returns_function(command):
         return True
 
 
-def pass_to_function(command, args):
-    command = command.replace('!', '')
-
+def pass_to_function(command, args, sender, online_users):
     module = importlib.import_module('src.lib.commands.%s' % command)
     function = getattr(module, command)
 
-    if args:
-        # need to reference to src.lib.commands.<command
-        return function(args)
-    else:
-        # need to reference to src.lib.commands.<command
-        return function()
+    # need to reference to src.lib.commands.<command
+    result = function(args, sender, online_users)
+    if isinstance(args, types.StringTypes):
+        return (result, )

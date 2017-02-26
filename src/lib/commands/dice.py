@@ -3,7 +3,8 @@ from __future__ import print_function
 import random
 
 
-def dice(args):
+# noinspection PyUnusedLocal
+def dice(args, sender, online_users):
     usage = '!dice <num>d<sides> [<num>d<sides>] ...'
     dices = []
 

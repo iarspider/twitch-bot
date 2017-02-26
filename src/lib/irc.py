@@ -70,12 +70,10 @@ class irc:
             pp('Login unsuccessful. (hint: make sure your oauth token is set in self.config/self.config.py).', 'error')
             sys.exit()
 
-        sock.send("CAP REQ :twitch.tv/membership")
-
-        if self.check_for_cap(sock.recv(2014)):
-            pp('Capabilities request successful')
-        else:
-            pp('Failed to request capabilities')
+        # sock.send("CAP REQ :twitch.tv/tags\x0d\x0a")
+        sock.send("CAP REQ :twitch.tv/commands\x0d\x0a")
+        sock.send("CAP REQ :twitch.tv/membership\x0d\x0a")
+        sock.send("CAP END\x0d\x0a")
 
         # start threads for channels that have cron messages to run
         for channel in self.config['channels']:
@@ -100,8 +98,20 @@ class irc:
         self.sock.send('PART %s\r\n' % channels)
         pp('Left channels.')
 
-    def check_for_cap(self, data):
-        if re.match(r'^:(testserver\.local|tmi\.twitch\.tv) CAP \* ACK :twitch.tv/membership\r\n$', data):
+    def check_for_join(self, data):
+        if re.match(
+                r'^:[a-zA-Z0-9_]+\![a-zA-Z0-9_]+@[a-zA-Z0-9_]+(\.tmi\.twitch\.tv|\.testserver\.local) JOIN #[a-zA-Z0-9_]+',
+                data):
             return True
-        else:
-            return False
+
+    def get_join(self, data):
+        return re.findall(r'^:.+\!([a-zA-Z0-9_]+)@[a-zA-Z0-9_]+.+ JOIN (#[a-zA-Z0-9_]+)', data)[0]
+
+    def check_for_part(self, data):
+        if re.match(
+                r'^:[a-zA-Z0-9_]+\![a-zA-Z0-9_]+@[a-zA-Z0-9_]+(\.tmi\.twitch\.tv|\.testserver\.local) PART #[a-zA-Z0-9_]+',
+                data):
+            return True
+
+    def get_part(self, data):
+        return re.findall(r'^:.+\!([a-zA-Z0-9_]+)@[a-zA-Z0-9_]+.+ PART (#[a-zA-Z0-9_]+)', data)[0]
