@@ -65,5 +65,7 @@ def pass_to_function(command, args, sender, online_users):
 
     # need to reference to src.lib.commands.<command
     result = function(args, sender, online_users)
-    if isinstance(args, types.StringTypes):
-        return (result, )
+    if isinstance(result, types.StringTypes):
+        return result,
+    else:
+        return result

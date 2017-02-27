@@ -4,10 +4,11 @@ Simple IRC Bot for Twitch.tv
 Developed by Aidan Thomson <aidraj0@gmail.com>
 """
 
+from collections import defaultdict
+
 import lib.functions_commands as commands
 import lib.irc as irc_
 from lib.functions_general import *
-from collections import defaultdict
 
 
 class Roboraj:
@@ -39,7 +40,7 @@ class Roboraj:
                 user, channel = irc.get_join(data)
                 self.users[channel].add(user)
                 pp("User {0} joined {1}".format(user, channel))
-    
+
             if irc.check_for_part(data):
                 user, channel = irc.get_part(data)
                 try:
@@ -63,12 +64,12 @@ class Roboraj:
 
                     if commands.check_returns_function(command.split(' ')[0]):
                         if commands.check_has_correct_args(command, command.split(' ')[0]):
-                            command = command.split(' ')[0]
+                            command_name = command.split(' ')[0]
                             args = command.split(' ')[1:]
 
-                            if commands.is_on_cooldown(command, channel):
+                            if commands.is_on_cooldown(command_name, channel):
                                 pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (
-                                    command, username, commands.get_cooldown_remaining(command, channel)),
+                                    command, username, commands.get_cooldown_remaining(command_name, channel)),
                                      channel
                                      )
                             else:
@@ -77,8 +78,9 @@ class Roboraj:
                                      channel
                                      )
 
-                                result = commands.pass_to_function(command[1:], args, username, self.users[channel])
-                                commands.update_last_used(command, channel)
+                                result = commands.pass_to_function(command_name[1:], args, username,
+                                                                   self.users[channel])
+                                commands.update_last_used(command_name, channel)
 
                                 if result:
                                     for r in result:
