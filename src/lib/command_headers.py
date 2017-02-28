@@ -5,12 +5,12 @@ commands = {
         'limit': 5,
         'argc': '*',
         'return': 'command'
-    },
-    '!attack': {
-        'limit': 5,
-        'argc': 1,
-        'return': 'command'
-    }
+    }  #,
+    # '!attack': {
+    #     'limit': 5,
+    #     'argc': 1,
+    #     'return': 'command'
+    # }
 }
 
 for channel in config['channels']:

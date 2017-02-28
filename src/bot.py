@@ -24,85 +24,87 @@ class Roboraj:
         config = self.config
 
         while True:
-            data = sock.recv(config['socket_buffer_size']).rstrip()
+            data_raw = sock.recv(config['socket_buffer_size']).rstrip()
 
-            if len(data) == 0:
-                pp('Connection was lost, reconnecting.')
-                sock = self.irc.get_irc_socket_object()
+            for data in data_raw.split('\r'):
+                data = data.strip()
+                if len(data) == 0:
+                    pp('Connection was lost, reconnecting.')
+                    sock = self.irc.get_irc_socket_object()
 
-            if config['debug']:
-                print data
+                if config['debug']:
+                    print data
 
-            # check for ping, reply with pong
-            irc.check_for_ping(data)
+                # check for ping, reply with pong
+                irc.check_for_ping(data)
 
-            if irc.check_for_join(data):
-                user, channel = irc.get_join(data)
-                self.users[channel].add(user)
-                pp("User {0} joined {1}".format(user, channel))
+                if irc.check_for_join(data):
+                    user, channel = irc.get_join(data)
+                    self.users[channel].add(user)
+                    pp("User {0} joined {1}".format(user, channel))
 
-            if irc.check_for_part(data):
-                user, channel = irc.get_part(data)
-                try:
-                    self.users[channel].remove(user)
-                except KeyError:
-                    pass
-                pp("User {0} left {1}".format(user, channel))
+                if irc.check_for_part(data):
+                    user, channel = irc.get_part(data)
+                    try:
+                        self.users[channel].remove(user)
+                    except KeyError:
+                        pass
+                    pp("User {0} left {1}".format(user, channel))
 
-            if irc.check_for_message(data):
-                message_dict = irc.get_message(data)
+                if irc.check_for_message(data):
+                    message_dict = irc.get_message(data)
 
-                channel = message_dict['channel']
-                message = message_dict['message']
-                username = message_dict['username']
+                    channel = message_dict['channel']
+                    message = message_dict['message']
+                    username = message_dict['username']
 
-                ppi(channel, message, username)
+                    ppi(channel, message, username)
 
-                # check if message is a command with no arguments
-                if commands.is_valid_command(message) or commands.is_valid_command(message.split(' ')[0]):
-                    command = message
+                    # check if message is a command with no arguments
+                    if commands.is_valid_command(message) or commands.is_valid_command(message.split(' ')[0]):
+                        command = message
 
-                    if commands.check_returns_function(command.split(' ')[0]):
-                        if commands.check_has_correct_args(command, command.split(' ')[0]):
-                            command_name = command.split(' ')[0]
-                            args = command.split(' ')[1:]
+                        if commands.check_returns_function(command.split(' ')[0]):
+                            if commands.check_has_correct_args(command, command.split(' ')[0]):
+                                command_name = command.split(' ')[0]
+                                args = command.split(' ')[1:]
 
-                            if commands.is_on_cooldown(command_name, channel):
+                                if commands.is_on_cooldown(command_name, channel):
+                                    pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (
+                                        command, username, commands.get_cooldown_remaining(command_name, channel)),
+                                         channel
+                                         )
+                                else:
+                                    pbot('Command is valid an not on cooldown. (%s) (%s)' % (
+                                        command, username),
+                                         channel
+                                         )
+
+                                    result = commands.pass_to_function(command_name[1:], args, username,
+                                                                       self.users[channel])
+                                    commands.update_last_used(command_name, channel)
+
+                                    if result:
+                                        for r in result:
+                                            resp = '(%s) > %s' % (username, r)
+                                            pbot(resp, channel)
+                                            irc.send_message(channel, resp)
+
+                        else:
+                            if commands.is_on_cooldown(command, channel):
                                 pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (
-                                    command, username, commands.get_cooldown_remaining(command_name, channel)),
+                                    command, username, commands.get_cooldown_remaining(command, channel)),
                                      channel
                                      )
-                            else:
-                                pbot('Command is valid an not on cooldown. (%s) (%s)' % (
+                            elif commands.check_has_return(command):
+                                pbot('Command is valid and not on cooldown. (%s) (%s)' % (
                                     command, username),
                                      channel
                                      )
+                                commands.update_last_used(command, channel)
 
-                                result = commands.pass_to_function(command_name[1:], args, username,
-                                                                   self.users[channel])
-                                commands.update_last_used(command_name, channel)
+                                resp = '(%s) > %s' % (username, commands.get_return(command))
+                                commands.update_last_used(command, channel)
 
-                                if result:
-                                    for r in result:
-                                        resp = '(%s) > %s' % (username, r)
-                                        pbot(resp, channel)
-                                        irc.send_message(channel, resp)
-
-                    else:
-                        if commands.is_on_cooldown(command, channel):
-                            pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (
-                                command, username, commands.get_cooldown_remaining(command, channel)),
-                                 channel
-                                 )
-                        elif commands.check_has_return(command):
-                            pbot('Command is valid and not on cooldown. (%s) (%s)' % (
-                                command, username),
-                                 channel
-                                 )
-                            commands.update_last_used(command, channel)
-
-                            resp = '(%s) > %s' % (username, commands.get_return(command))
-                            commands.update_last_used(command, channel)
-
-                            pbot(resp, channel)
-                            irc.send_message(channel, resp)
+                                pbot(resp, channel)
+                                irc.send_message(channel, resp)

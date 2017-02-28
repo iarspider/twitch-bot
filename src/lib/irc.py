@@ -28,7 +28,7 @@ class irc:
 
     def check_for_ping(self, data):
         if data[:4] == "PING":
-            self.sock.send('PONG')
+            self.sock.send('PONG\r\n')
 
     def get_message(self, data):
         return {
@@ -44,7 +44,7 @@ class irc:
             return True
 
     def send_message(self, channel, message):
-        self.sock.send('PRIVMSG %s :%s\n' % (channel, message.encode('utf-8')))
+        self.sock.send('PRIVMSG %s :%s\r\n' % (channel, message.encode('utf-8')))
 
     def get_irc_socket_object(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -72,8 +72,8 @@ class irc:
 
         # sock.send("CAP REQ :twitch.tv/tags\x0d\x0a")
         # sock.send("CAP REQ :twitch.tv/commands\x0d\x0a")
-        sock.send("CAP REQ :twitch.tv/membership\x0d\x0a")
-        sock.send("CAP END\x0d\x0a")
+        sock.send("CAP REQ :twitch.tv/membership\r\n")
+        sock.send("CAP END\r\n")
 
         # start threads for channels that have cron messages to run
         for channel in self.config['channels']:
