@@ -29,6 +29,9 @@ class irc:
     def check_for_ping(self, data):
         if data[:4] == "PING":
             self.sock.send('PONG\r\n')
+            return True
+        
+        return False
 
     def get_message(self, data):
         return {

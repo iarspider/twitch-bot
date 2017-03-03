@@ -36,20 +36,23 @@ class Roboraj:
                     print data
 
                 # check for ping, reply with pong
-                irc.check_for_ping(data)
+                if irc.check_for_ping(data):
+                    continue
 
                 if irc.check_for_join(data):
                     user, channel = irc.get_join(data)
-                    self.users[channel].add(user)
+                    self.users[channel].add(user.lower())
                     pp("User {0} joined {1}".format(user, channel))
+                    continue
 
                 if irc.check_for_part(data):
                     user, channel = irc.get_part(data)
                     try:
-                        self.users[channel].remove(user)
+                        self.users[channel].remove(user.lower())
                     except KeyError:
                         pass
                     pp("User {0} left {1}".format(user, channel))
+                    continue
 
                 if irc.check_for_message(data):
                     message_dict = irc.get_message(data)

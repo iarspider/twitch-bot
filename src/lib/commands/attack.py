@@ -24,10 +24,12 @@ def attack(args, sender, online_users):
     attack_d = random.randint(1, 6)
     defence_d = random.randint(1, 6)
 
+    result.append("@{0} rolls {1}, @{2} rolls {3}".format(sender, attack_d, args[0], defence_d))
+
     if attack_d > defence_d:
-        result.append("@{0} wins!")
+        result.append("@{0} wins!".format(sender))
     elif attack_d < defence_d:
-        result.append("@{1} wins!")
+        result.append("@{0} wins!".format(args[0]))
     else:
         result.append("It's a draw!")
 
