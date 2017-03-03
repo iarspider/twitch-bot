@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from irc3.plugins.command import command
 import irc3
+from irc3.plugins.command import command
 
 
 @irc3.plugin
 class ArachnoBot:
-
     def __init__(self, bot):
         self.bot = bot
 
