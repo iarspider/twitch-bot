@@ -32,8 +32,9 @@ def get_streamlabs_session(client_id, client_secret, redirect_uri):
         token = get_token(client_id, client_secret, redirect_uri)
 
     scope = ['points.read', 'points.write']
-    oauth = OAuth2Session(client_id, token=token, auto_refresh_url="https://streamlabs.com/api/v1.0/authorize",
-                          redirect_uri=redirect_uri, scope=scope)
+    oauth = OAuth2Session(client_id, token=token, auto_refresh_url="https://streamlabs.com/api/v1.0/token",
+                          auto_refresh_kwargs={'client_id': client_id, 'client_secret': client_secret},
+                          redirect_uri=redirect_uri, scope=scope, token_updater=token_saver)
 
     return oauth
 
