@@ -1,4 +1,6 @@
 .idea
 config.py
+config.ini
+*.cmd
 token.json
 __pycache__
