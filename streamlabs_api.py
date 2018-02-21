@@ -31,9 +31,9 @@ def get_streamlabs_session(client_id, client_secret, redirect_uri):
         print("Failed to load token!")
         token = get_token(client_id, client_secret, redirect_uri)
 
+    scope = ['points.read', 'points.write']
     oauth = OAuth2Session(client_id, token=token, auto_refresh_url="https://streamlabs.com/api/v1.0/authorize",
-                          auto_refresh_kwargs={"redirect_uri": redirect_uri,
-                                               "scope": ['donations.read', 'points.read']})
+                          redirect_uri=redirect_uri, scope=scope)
 
     return oauth
 
@@ -53,6 +53,20 @@ def sub_points(oauth, username, points, channel='iarspider'):
 
 def main():
     from config import client_id, client_secret, redirect_uri
+    import logging
+    try:
+        import http.client as http_client
+    except ImportError:
+        # Python 2
+        # noinspection PyUnresolvedReferences
+        import httplib as http_client
+
+    http_client.HTTPConnection.debuglevel = 1
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+    requests_log = logging.getLogger("requests.packages.urllib3")
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
     oauth = get_streamlabs_session(client_id, client_secret, redirect_uri)
     points = get_points(oauth, 'iarspider')
     from pprint import pprint
