@@ -6,12 +6,14 @@ import requests
 # import simplejson
 # from requests_oauthlib import OAuth2Session
 import streamlabs_api as api
+from obswebsocket import requests as obsws_requests
+from obswebsocket import obsws  # , requests, events
 
 import irc3
 from irc3.plugins.command import command
 
 from config import *
-
+import codecs
 
 @irc3.plugin
 class ArachnoBot:
@@ -19,6 +21,11 @@ class ArachnoBot:
         self.bot = bot
         self.channel = '#iarspider'
         self.oauth = api.get_streamlabs_session(client_id, client_secret, redirect_uri)
+        self.ws = obsws('192.168.1.199', 4444, 'spider')
+        self.ws.connect()
+        self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
+        self.plusches = 0
+        self.write_plusch()
 
     # @irc3.event(irc3.rfc.JOIN)
     # def say_hi(self, mask, channel, **kw):
@@ -114,38 +121,44 @@ class ArachnoBot:
             self.bot.privmsg(self.channel, "Бой закончился вничью!")
 
     # noinspection PyUnusedLocal
-    @command(permission='view')
+    @command(permission='view', aliases=("кусь",))
     # @command(permission='special')
     def bite(self, mask, target, args):
         """
             выясни сам
             %% bite <player>
         """
+        if not 'bite' in self.bot.db:
+            self.bot.db['bite'] = {}
 
         now = datetime.datetime.now()
 
         attacker = mask.nick
         defender = args["<player>"].lstrip('@')
         try:
-            last_bite = self.bot.db[attacker + '@bite']
+            last_bite = self.bot.db['bite'][attacker]
         except KeyError:
             last_bite = 31525200.0  # some arbitrary time
 
         last_bite = datetime.datetime.fromtimestamp(last_bite)
-        if (now - last_bite).seconds < 90:
+        if (now - last_bite).seconds < 90 and attacker != 'iarspider':
             self.bot.privmsg(self.channel, "Не кусай так часто, @{0}! Дай моим челюстям отдохнуть!".format(attacker))
             return
+        
+        self.bot.db['bite'][attacker] = now.timestamp()
 
-        self.bot.db[attacker + '@bite'] = now.timestamp()
-
-        if defender in ['arachnobot', 'Nightbot']:
+        if defender.lower() in ['arachnobot', 'nightbot']:
             self.bot.privmsg(self.channel, '/w ' + attacker + ' Не сметь!')
             self.bot.privmsg(self.channel, '/timeout ' + attacker + ' 300')
-            self.bot.privmsg(self.channel, '@' + attacker + ' попытался укусить ботика, но не смог :\'(')
+            self.bot.privmsg(self.channel, '@' + attacker + ' попытался укусить ботика. @'+attacker+' SMOrc')
             return
 
-        if attacker == defender:
-            self.bot.privmsg(self.channel, '@{0} укусил сам себя. Зачем? Загадка...'.format(attacker))
+        if defender.lower() == 'кусь':
+            self.bot.privmsg(self.channel, '/timeout ' + attacker + ' 1')
+            self.bot.privmsg(self.channel, '@' + attacker + ' попытался сломать систему, но не смог BabyRage')
+
+        if attacker.lower() == defender.lower():
+            self.bot.privmsg(self.channel, '@{0} укусил сам себя за жопь. Как, а главное - зачем он это сделал? Загадка...'.format(attacker))
             return
 
         prefix = u"нежно " if random.randint(1, 2) == 1 else "ласково "
@@ -160,7 +173,7 @@ class ArachnoBot:
         self.bot.privmsg(self.channel, "По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender, target))
 
     # noinspection PyUnusedLocal
-    @command(permissions='view')
+    @command(permissions='view', aliasrs=("баги",))
     def bugs(self, mask, target, args):
         """
             Показывает текущее число "багов" (очков лояльности)
@@ -173,8 +186,44 @@ class ArachnoBot:
         except requests.HTTPError:
             res = 0
 
-        self.bot.privmsg(self.channel, '/w ' + user + ' У вас {0} баг(ов)'.format(res))
+        self.bot.privmsg(self.channel, '/w ' + user + ' Набрано багов: {0}'.format(res))
 
+    # noinspection PyUnusedLocal
+    @command(permissions='streamer', aliases=("break",))
+    def pause(self, mask, target, args):
+        """
+            Запускает перерыв
+
+            %%pause
+        """
+        res = self.ws.call(obsws_requests.SetCurrentScene("Paused"))
+        self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
+
+    @command(permissions='streamer', aliases=("continue",))
+    def resume(self, mask, target, args):
+        """
+            Отменяет перерыв
+
+            %%resume
+        """
+        res = self.ws.call(obsws_requests.SetCurrentScene("Game"))
+        self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
+
+    @command(permissions='streamer', aliases=("плющ",))
+    def plusch(self, mask, target, args):
+        """
+            Раздаёт плющи
+
+            %% plusch <who>
+        """
+        who = args["<who>"]
+        self.bot.privmsg(self.channel, "Эк {0} поплющило...".format(who))
+        self.plusches += 1
+        self.write_plusch()
+
+    def write_plusch(self):
+        with codecs.open("e:\\plusch.txt", "w", "utf8") as f:
+            f.write("Кого-то поплющило {0} раз...".format(self.plusches))
 
 def main():
     # instanciate a bot
