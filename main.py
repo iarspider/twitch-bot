@@ -11,9 +11,14 @@ from obswebsocket import obsws  # , requests, events
 
 import irc3
 from irc3.plugins.command import command
+from irc3.testing import ini2config
+from irc3.rfc import raw
 
 from config import *
 import codecs
+
+USERSTATE = raw.new('USERSTATE',
+               r'^(@(?P<tags>\S+) )?:(?P<mask>\S+) USERSTATE :?(?P<channel>\S+)')
 
 @irc3.plugin
 class ArachnoBot:
@@ -26,14 +31,30 @@ class ArachnoBot:
         self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
         self.plusches = 0
         self.write_plusch()
+        self.mods = []
+        self.subs = []
+        self.viewers = []
 
     # @irc3.event(irc3.rfc.JOIN)
     # def say_hi(self, mask, channel, **kw):
+    #     self.viewers.add(mask.nick)
     #     """Say hi when someone join a channel"""
     # if mask.nick == self.bot.nick:
     #    self.bot.privmsg(channel, 'Hi %s!' % mask.nick)
     # else:
     #    self.bot.privmsg(channel, u'Арахнобот прибыл и готов к работе!')
+
+    @irc3.event(USERSTATE)
+    def userstate(self, tags, mask, channel):
+        tags_list = tags.split(';')
+        tags_dict = {}
+        for tag in tags_list:
+            key, val = tag.split('=')
+            tags_dict[key] = val
+            
+        if int(tags_dict['mod']) == 1:
+            self.mods.append(tags_dict
+
 
     # @command(permission='view')
     # def echo(self, mask, target, args):
@@ -173,7 +194,7 @@ class ArachnoBot:
         self.bot.privmsg(self.channel, "По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender, target))
 
     # noinspection PyUnusedLocal
-    @command(permissions='view', aliasrs=("баги",))
+    @command(permissions='view', aliases=("баги",))
     def bugs(self, mask, target, args):
         """
             Показывает текущее число "багов" (очков лояльности)
@@ -189,7 +210,7 @@ class ArachnoBot:
         self.bot.privmsg(self.channel, '/w ' + user + ' Набрано багов: {0}'.format(res))
 
     # noinspection PyUnusedLocal
-    @command(permissions='streamer', aliases=("break",))
+    @command(permissions='streamer', aliases=("break","икуфл"), show_in_help_list=False)
     def pause(self, mask, target, args):
         """
             Запускает перерыв
@@ -199,7 +220,7 @@ class ArachnoBot:
         res = self.ws.call(obsws_requests.SetCurrentScene("Paused"))
         self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
 
-    @command(permissions='streamer', aliases=("continue",))
+    @command(permissions='streamer', aliases=("continue","куыгьу"), show_in_help_list=False)
     def resume(self, mask, target, args):
         """
             Отменяет перерыв
@@ -239,6 +260,32 @@ def main():
         'storage': 'json://bot.json',
         'debug': 'False'
     }
+
+    newconfig = ini2config("""[irc3.plugins.command]
+# command plugin configuration
+
+# set command char
+cmd = !
+
+# set guard policy
+guard = irc3.plugins.command.mask_based_policy
+
+[irc3.plugins.command.masks]
+# this section is used by the guard to secure the bot's command
+# change your nickname and uncomment the line below
+iarspider!*@* = all_permissions
+* = view
+iarspider!*@* = streamer
+CweLTH!*@* = special
+KLMendor!*@* = special
+Prayda_Alpha!*@* = special
+LoopuTaps!*@* = special
+BabyTigerOnTheSunflower!*@* = special""")
+
+    config.update(newconfig)
+    # from pprint import pprint
+    # pprint (config)
+    # return
 
     bot = irc3.IrcBot.from_config(config)
     bot.include(
