@@ -2,5 +2,6 @@
 config.py
 config.ini
 *.cmd
+*.pyc
 token.json
 __pycache__

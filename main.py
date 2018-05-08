@@ -12,13 +12,11 @@ from obswebsocket import obsws  # , requests, events
 import irc3
 from irc3.plugins.command import command
 from irc3.testing import ini2config
-from irc3.rfc import raw
+# from irc3.rfc import raw
+from irc3.tags import decode
 
 from config import *
 import codecs
-
-USERSTATE = raw.new('USERSTATE',
-               r'^(@(?P<tags>\S+) )?:(?P<mask>\S+) USERSTATE :?(?P<channel>\S+)')
 
 @irc3.plugin
 class ArachnoBot:
@@ -31,38 +29,60 @@ class ArachnoBot:
         self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
         self.plusches = 0
         self.write_plusch()
-        self.mods = []
-        self.subs = []
-        self.viewers = []
+        self.mods = set()
+        self.subs = set()
+        self.viewers = set()
+        self.aliases = {}
+        self.aliases_r = {}
 
-    # @irc3.event(irc3.rfc.JOIN)
-    # def say_hi(self, mask, channel, **kw):
-    #     self.viewers.add(mask.nick)
-    #     """Say hi when someone join a channel"""
-    # if mask.nick == self.bot.nick:
-    #    self.bot.privmsg(channel, 'Hi %s!' % mask.nick)
-    # else:
-    #    self.bot.privmsg(channel, u'Арахнобот прибыл и готов к работе!')
+    def is_online(self, nick):
+        nick = nick.lower()
+        alias = [self.aliases.get(nick, None), self.aliases_r.get(nick, None), nick]
+        online_my  = any(x in self.viewers for x in alias if x is not None)
+        online_bot = any(x in self.bot.channels[self.channel] for x in alias if x is not None)
+        self.bot.privmsg(self.channel, '/w iarspider Online irc3: ' + ';'.join(self.bot.channels[self.channel]))
+        self.bot.privmsg(self.channel, '/w iarspider Online bot : ' + ';'.join(self.viewers))
 
-    @irc3.event(USERSTATE)
-    def userstate(self, tags, mask, channel):
-        tags_list = tags.split(';')
-        tags_dict = {}
-        for tag in tags_list:
-            key, val = tag.split('=')
-            tags_dict[key] = val
-            
-        if int(tags_dict['mod']) == 1:
-            self.mods.append(tags_dict
+    def is_mod(self, nick):
+        nick = nick.lower()
+        alias = [self.aliases.get(nick, None), self.aliases_r.get(nick, None)]
+        is_mod_by_prefix = any(x in self.bot.channels[self.channel].modes['@'] for x in alias if x is not None)
+        is_known_mod = any(x in self.mods for x in alias if x is not None)
+        return is_mod_by_prefix or is_known_mod
+    
+    @irc3.event(irc3.rfc.JOIN)
+    def on_join(self, mask, channel):
+        if mask.nick == 'arachnobot':
+            self.bot.privmsg(self.channel, '/mods')
 
 
-    # @command(permission='view')
-    # def echo(self, mask, target, args):
-    # """Echo
+    @irc3.event(irc3.rfc.PRIVMSG)
+    def on_modlist(self, tags, mask, event, target, data):
+        def parse_badges(data):
+            if (not data) or '/' not in data:
+                return {}
+            return dict(x.split('/') for x in data.split(','))
 
-    # %%echo <message>...
-    # """
-    # yield ' '.join(args['<message>'])
+        tags_dict = decode(tags)
+
+        if event == 'NOTICE' and tags_dict.get('msg-id', '') == 'room_mods':  
+            self.mods.update(x.strip() for x in data.split(':', 1)[1].strip().split(','))
+            return
+
+        if event == 'PRIVMSG':
+            badges = parse_badges(tags_dict.get('badges', ''))
+            if badges.get('broadcaster', '0') == '1' or badges.get('moderator', '0') == '1' or tags_dict.get('mod', '0') == '1':
+                if mask.nick not in self.mods:
+                    self.bot.privmsg(self.channel, '/w iarspider I see a mod: '+mask.nick)
+                self.mods.add(mask.nick)
+
+            if badges.get('subscriber', '0') == '1' or tags_dict.get('subscriber', '0') == 1:
+                if mask.nick not in self.subs:
+                    self.bot.privmsg(self.channel, '/w iarspider I see a sub: '+mask.nick)
+                self.subs.add(mask.nick)
+
+            self.viewers.add(mask.nick)
+            return
 
     # noinspection PyUnusedLocal
     @command(permission='view')
@@ -112,10 +132,14 @@ class ArachnoBot:
         """
 
         attacker = mask.nick
-        defender = args["<player>"]
+        defender = args["<player>"].strip('@')
         # if defender not in list(self.bot.channels[self.channel]):
         #     self.bot.privmsg(self.channel, u"> {1}, {0} сейчас не в сети!".format(attacker, defender))
         #     return
+        alias = [self.aliases.get(defender, None), self.aliases_r.get(defender, None)]
+        if not is_online(defender):
+            self.bot.privmsg(self.channel, u"Эй, @{1}, ты не можешь напасть на {0} - он(а) сейчас не в сети!".format(attacker, defender))
+            return
 
         if defender == attacker:
             self.bot.privmsg(self.channel, "РКН на вас нет, негодяи!")
@@ -165,7 +189,11 @@ class ArachnoBot:
         if (now - last_bite).seconds < 90 and attacker != 'iarspider':
             self.bot.privmsg(self.channel, "Не кусай так часто, @{0}! Дай моим челюстям отдохнуть!".format(attacker))
             return
-        
+
+        if not self.is_online(defender):
+            self.bot.privmsg(self.channel, 'Кто такой или такая @'+defender+'? Я не буду кусать кого попало!')
+            return
+
         self.bot.db['bite'][attacker] = now.timestamp()
 
         if defender.lower() in ['arachnobot', 'nightbot']:
@@ -219,6 +247,7 @@ class ArachnoBot:
         """
         res = self.ws.call(obsws_requests.SetCurrentScene("Paused"))
         self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
+        yield 'ОК'
 
     @command(permissions='streamer', aliases=("continue","куыгьу"), show_in_help_list=False)
     def resume(self, mask, target, args):
@@ -229,15 +258,21 @@ class ArachnoBot:
         """
         res = self.ws.call(obsws_requests.SetCurrentScene("Game"))
         self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
+        yield 'ОК'
 
     @command(permissions='streamer', aliases=("плющ",))
     def plusch(self, mask, target, args):
         """
             Раздаёт плющи
 
-            %% plusch <who>
+            %% plusch <who>...
         """
-        who = args["<who>"]
+        if not self.is_mod(mask.nick) and mask.nick != 'iarspider':
+            self.bot.privmsg(self.channel, "No effect? I'm going to need a bigger sword.")
+            self.bot.privmsg(self.channel, "/w iarspider " + ",".join(x for x in self.mods))
+            return
+
+        who = " ".join(args["<who>"])
         self.bot.privmsg(self.channel, "Эк {0} поплющило...".format(who))
         self.plusches += 1
         self.write_plusch()
@@ -245,6 +280,16 @@ class ArachnoBot:
     def write_plusch(self):
         with codecs.open("e:\\plusch.txt", "w", "utf8") as f:
             f.write("Кого-то поплющило {0} раз...".format(self.plusches))
+
+    @command(permissions='streamer', show_in_help_list=False)
+    def mods(self, mask, target, args):
+        """
+            Показывает список модераторов
+
+            %% mods
+        """
+
+        self.bot.privmsg(self.channel, ','.join(self.mods))
 
 def main():
     # instanciate a bot
@@ -256,9 +301,10 @@ def main():
         'host': 'irc.twitch.tv',
         'port': '6667',
         'autojoins': ['#iarspider'],
-        'autocommands': ['CAP REQ :twitch.tv/membership', 'CAP REQ :twitch.tv/commands'],
+        'autocommands': ['CAP REQ :twitch.tv/membership', 'CAP REQ :twitch.tv/commands', 'CAP REQ :twitch.tv/tags'],
         'storage': 'json://bot.json',
-        'debug': 'False'
+        'debug': True,
+        'raw': True
     }
 
     newconfig = ini2config("""[irc3.plugins.command]
@@ -283,8 +329,8 @@ LoopuTaps!*@* = special
 BabyTigerOnTheSunflower!*@* = special""")
 
     config.update(newconfig)
-    # from pprint import pprint
-    # pprint (config)
+    from pprint import pprint
+    pprint (config)
     # return
 
     bot = irc3.IrcBot.from_config(config)
